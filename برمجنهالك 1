@@ -1,0 +1,104 @@
+/*1.	تثبيت المكتبات:
+	•	قم بتثبيت مكتبة OpenCVSharp (OpenCV لـ C#).
+	•	قم بتثبيت مكتبة MediaPipe (بالتحديد لتتبع الوجه).
+
+يمكنك تحميل المكتبات عبر NuGet في Visual Studio:
+	•	OpenCvSharp4
+	•	MediaPipe (يجب التأكد من التوافق مع بيئة .NET).
+
+	2.	الكود:*/
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+using OpenCvSharp;
+using Mediapipe;
+
+public class FaceFilterApp : Form
+{
+    private Button btnSelectImage, btnShowFilter;
+    private PictureBox pictureBox;
+    private Mat selectedImage;
+    private Image filterImage;
+
+    public FaceFilterApp()
+    {
+        btnSelectImage = new Button { Text = "اختار صورة الفيلتر", Left = 10, Top = 10, Width = 150 };
+        btnShowFilter = new Button { Text = "عرض الفيلتر", Left = 10, Top = 40, Width = 150, Enabled = false };
+        pictureBox = new PictureBox { Left = 180, Top = 10, Width = 600, Height = 400 };
+
+        btnSelectImage.Click += BtnSelectImage_Click;
+        btnShowFilter.Click += BtnShowFilter_Click;
+
+        Controls.Add(btnSelectImage);
+        Controls.Add(btnShowFilter);
+        Controls.Add(pictureBox);
+    }
+
+    private void BtnSelectImage_Click(object sender, EventArgs e)
+    {
+        // اختيار صورة الفيلتر
+        OpenFileDialog openFileDialog = new OpenFileDialog
+        {
+            Filter = "Images|.png;.jpg;*.jpeg"
+        };
+
+        if (openFileDialog.ShowDialog() == DialogResult.OK)
+        {
+            filterImage = Image.FromFile(openFileDialog.FileName);
+            btnShowFilter.Enabled = true;
+        }
+    }
+
+    private void BtnShowFilter_Click(object sender, EventArgs e)
+    {
+        // بدء الكاميرا والتتبع
+        var capture = new VideoCapture(0);
+        var faceDetection = new FaceDetection();
+
+        while (true)
+        {
+            using (var frame = capture.RetrieveMat())
+            {
+                if (frame.Empty()) break;
+
+                // تحويل الصورة من BGR إلى RGB
+                var rgbFrame = frame.ToBitmap();
+
+                // استخدام MediaPipe للكشف عن الوجه
+                var faceLocations = faceDetection.DetectFaces(rgbFrame);
+
+                if (faceLocations.Count > 0)
+                {
+                    // وضع صورة الفيلتر على الوجه
+                    foreach (var faceLocation in faceLocations)
+                    {
+                        // وضع الفيلتر
+                        PlaceFilterOnFace(rgbFrame, faceLocation);
+                    }
+                }
+
+                pictureBox.Image = rgbFrame;
+            }
+
+            Application.DoEvents();
+        }
+    }
+
+    private void PlaceFilterOnFace(Bitmap frame, Rect faceLocation)
+    {
+        // تعديل حجم الفيلتر بناءً على حجم الوجه
+        var filterWidth = faceLocation.Width;
+        var filterHeight = (int)(filterWidth * (filterImage.Height / (double)filterImage.Width));
+        var filterRect = new Rectangle(faceLocation.X, faceLocation.Y - filterHeight / 2, filterWidth, filterHeight);
+
+        using (var graphics = Graphics.FromImage(frame))
+        {
+            graphics.DrawImage(filterImage, filterRect);
+        }
+    }
+
+    public static void Main()
+    {
+        Application.Run(new FaceFilterApp());
+    }
+}
